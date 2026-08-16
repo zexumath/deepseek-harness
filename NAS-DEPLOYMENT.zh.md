@@ -222,9 +222,23 @@ pkill -f 'bin.js web'
 
 已验证：`/usr/local/etc/rc.d/S99dsh-web.sh stop/start` 两分支均正常（2026-08-16 实测），DSM 开机时将自动以同样方式拉起。
 
-## 14. TODO / 待办
+## 14. 公网穿透尝试记录（2026-08-16，已回退）
 
-- [ ] 公网穿透（Tailscale 优先）
+**方案 2 尝试：Tailscale Funnel + Caddy basic auth（为鸿蒙 NEXT 手机提供公网 + 认证入口）**
+
+- 下载 Caddy v2.11.4 静态二进制至 `~/.local/bin/caddy`；Caddyfile 在 `~/.local/etc/dsh/Caddyfile`（basic auth + 反代 127.0.0.1:3080，监听 127.0.0.1:8080）；密码哈希用 `caddy hash-password` 生成。
+- `tailscale serve --bg 8080` + `tailscale funnel --bg 8080` 配置成功，域名 `https://ds420plus.taildfa60f.ts.net/`。
+- **失败现象**：所有设备（鸿蒙公网、iPhone/电脑 tailnet 内）访问该域名均为空白页，无认证弹框；Caddy access log 无任何请求记录（请求未到达 Caddy）；重启 Tailscale 套件无效。
+- **结论**：DSM 上 tailscaled 为 userspace-networking 模式，serve/funnel 从 3080 改指 8080 后转发失败（回退到 3080 即恢复，说明 tailscaled→127.0.0.1:3080 通、→8080 不通的原因未定位，待 Tailscale 更新后再试）。
+- **回退**：`tailscale funnel --https=443 off` + `tailscale serve --bg 3080`；Caddy 已停（supervisor 脚本中 Caddy 启动段注释保留）。
+- **当前状态**：ts.net 域名仅 tailnet 内可用（直达 3080，无认证）；鸿蒙 NEXT（无 Tailscale 客户端）仍无访问途径。
+
+恢复认证层的步骤（以后再试）：取消 supervisor 里 Caddy 段注释 → 启动 Caddy → `tailscale serve --bg 8080` → 验证 401 弹框后再开 funnel。
+
+## 15. TODO / 待办
+
+- [ ] 鸿蒙 NEXT 手机访问 DSH（公网 + 认证）：Funnel+Caddy 未通，待 Tailscale 修复或改试 Cloudflare Tunnel+Access / frp+VPS
+- [x] 公网穿透（Tailscale 基础组网，Windows/iPhone 已可用）
 - [x] DSH 开机自启 + 崩溃拉起（supervisor + /usr/local/etc/rc.d/S99dsh-web.sh）
 - [x] pi ↔ DSH 共享 skills（symlink `~/butler-brain/skills/*` → `~/.agents/skills/`）
 - [x] pi ↔ DSH 共享 memory（`~/.dsh/AGENTS.md` → butler-brain/AGENTS.md + skills 绝对路径）
