@@ -181,9 +181,49 @@ dsh --profile headless "家里还有鸡蛋吗？"           # 应读 memory/food
 - 写操作（买进/用完）需 DSH 的文件写入权限，Web UI 会话里按需授权。
 - 会话工作目录：建议在 Web UI 开新会话时选 `~/butler-brain`（project root 与 pi 一致，AGENTS.md 项目层规则生效）；不选也可，skills 内为绝对路径。
 
-## 12. TODO / 待办
+## 12. Sandbox 与权限模式（NAS 无沙箱后端）
+
+本 NAS 内核 4.4（Landlock 需 5.13+）、Entware 无 bubblewrap 包 → DSH 沙箱后端不可用。默认 `workspace-write` 预设会报 `sandbox mode "workspace-write" is requested but no sandbox backend is usable`。
+
+解法：supervisor 脚本 export `DSH_PERMISSION_MODE=danger-full-access`（sandbox-policy 的 config 已支持该环境变量：`mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'`）。命令无沙箱直跑，家庭单用户可接受；日后若能装 bubblewrap，删掉这行即恢复。
+
+## 13. 开机自启（supervisor）
+
+`~/.local/bin/dsh-web-supervisor.sh`：循环跑 `dsh web`，退出后 5 秒拉起，日志 `/tmp/dsh-web.log`。
+开机注册：`/usr/local/etc/rc.d/S99dsh-web.sh`（DSM 开机自动执行 rc.d 目录），以 root 写：
+
+```sh
+#!/bin/sh
+case "$1" in
+  start)
+    /bin/su - xuze -c '/var/services/homes/xuze/.local/bin/dsh-web-supervisor.sh >/dev/null 2>&1 &'
+    ;;
+  stop)
+    pkill -f 'bin.js web'
+    pkill -f 'dsh-web-supervisor'
+    ;;
+esac
+```
+
+运行管理：
+```bash
+# 查看状态
+ps aux | grep -E 'supervisor|bin.js web' | grep -v grep
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3080/
+
+# 日志
+tail -f /tmp/dsh-web.log
+
+# 重启（停服务由 supervisor 自动拉起）
+pkill -f 'bin.js web'
+```
+
+（原 tmux `dsh` session 方式已废弃，改为 supervisor 常驻。）
+
+## 14. TODO / 待办
 
 - [ ] 公网穿透（Tailscale 优先）
-- [ ] DSH 开机自启 + 崩溃拉起（Synology 任务计划或 supervisor）
+- [x] DSH 开机自启 + 崩溃拉起（supervisor + /usr/local/etc/rc.d/S99dsh-web.sh）
 - [x] pi ↔ DSH 共享 skills（symlink `~/butler-brain/skills/*` → `~/.agents/skills/`）
 - [x] pi ↔ DSH 共享 memory（`~/.dsh/AGENTS.md` → butler-brain/AGENTS.md + skills 绝对路径）
+- [x] 沙箱问题：切 `DSH_PERMISSION_MODE=danger-full-access`（NAS 无 bwrap/Landlock）
