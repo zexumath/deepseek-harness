@@ -156,9 +156,34 @@ tmux send-keys -t dsh 'dsh web' Enter  # 起
 cd ~/dsh && git fetch upstream && git merge upstream/master
 ```
 
-## 10. TODO / 待办
+## 11. pi ↔ DSH 共享（skills + memory）
+
+已落地（2026-08-16）。核心机制：DSH 的 `dsh-skill-filesystem` 扫 `~/.agents/skills`（`$DSH_AGENTS_HOME`，默认 `~/.agents`），格式同为 `SKILL.md` + `name`/`description` frontmatter，与 pi 完全兼容；DSH 的 `dsh-agent-instructions` 读 `$DSH_HOME/AGENTS.md` 作为全局指令基线。
+
+```bash
+# 1) skills：symlink 到真实源头（butler-brain/skills + pi 的 grill-me）
+mkdir -p ~/.agents/skills
+ln -sfn ~/butler-brain/skills/* ~/.agents/skills/
+ln -sfn ~/.pi/agent/skills/grill-me ~/.agents/skills/grill-me
+
+# 2) memory 规则：DSH 全局 AGENTS.md → butler-brain 的 AGENTS.md
+ln -sfn ~/butler-brain/AGENTS.md ~/.dsh/AGENTS.md
+```
+
+验证方式（headless 端到端）：
+```bash
+dsh --profile headless "列出你所有可用的 skills"   # 应列出全部 6 个 skill
+dsh --profile headless "家里还有鸡蛋吗？"           # 应读 memory/food.md 回答
+```
+
+- skills 内容在 butler-brain/skills 单点维护，pi 和 DSH 共用（DSH watcher 默认跟随 symlink）。
+- memory 数据（memory/*.md）本身是纯文件，两个 agent 用同一套 skill + 绝对路径读写，天然一致。
+- 写操作（买进/用完）需 DSH 的文件写入权限，Web UI 会话里按需授权。
+- 会话工作目录：建议在 Web UI 开新会话时选 `~/butler-brain`（project root 与 pi 一致，AGENTS.md 项目层规则生效）；不选也可，skills 内为绝对路径。
+
+## 12. TODO / 待办
 
 - [ ] 公网穿透（Tailscale 优先）
 - [ ] DSH 开机自启 + 崩溃拉起（Synology 任务计划或 supervisor）
-- [ ] pi ↔ DSH 共享 skills：软链 `~/.pi/agent/skills/*` → `~/.agents/skills/`（DSH 默认扫该目录，格式兼容 SKILL.md）
-- [ ] pi ↔ DSH 共享 memory：DSH 会话 cwd 指到 `~/butler-brain`（AGENTS.md + memory/ 同为 md 文件）
+- [x] pi ↔ DSH 共享 skills（symlink `~/butler-brain/skills/*` → `~/.agents/skills/`）
+- [x] pi ↔ DSH 共享 memory（`~/.dsh/AGENTS.md` → butler-brain/AGENTS.md + skills 绝对路径）
