@@ -220,6 +220,8 @@ pkill -f 'bin.js web'
 
 （原 tmux `dsh` session 方式已废弃，改为 supervisor 常驻。）
 
+已验证：`/usr/local/etc/rc.d/S99dsh-web.sh stop/start` 两分支均正常（2026-08-16 实测），DSM 开机时将自动以同样方式拉起。
+
 ## 14. TODO / 待办
 
 - [ ] 公网穿透（Tailscale 优先）
